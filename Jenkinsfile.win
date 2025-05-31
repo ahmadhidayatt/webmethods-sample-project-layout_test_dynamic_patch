@@ -46,6 +46,8 @@ pipeline {
                         if (!objectsList) {
                             error('No packages found for patch deployment')
                         }
+                        
+                        // POINT 2: Gunakan target 'patch' disini
                         bat "${env.SAG_HOME}/common/lib/ant/bin/ant -DSAGHome=${env.SAG_HOME} -DSAG_CI_HOME=${env.SAG_CI_HOME} -DprojectName=${env.JOB_NAME} -DobjectsToDeploy=\"${objectsList}\" patch"
                     } else {
                         bat "${env.SAG_HOME}/common/lib/ant/bin/ant -DSAGHome=${env.SAG_HOME} -DSAG_CI_HOME=${env.SAG_CI_HOME} -DprojectName=${env.JOB_NAME} deploy"
@@ -91,4 +93,4 @@ def generateObjectsList(packagesPath) {
     }
     
     return packages.join(',')
-} 
+}
