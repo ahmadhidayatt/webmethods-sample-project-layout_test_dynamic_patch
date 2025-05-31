@@ -91,4 +91,4 @@ def generateObjectsList(packagesPath) {
     }
     
     return packages.join(',')
-}
+} 
