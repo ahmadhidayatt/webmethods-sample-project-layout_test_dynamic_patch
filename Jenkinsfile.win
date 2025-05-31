@@ -20,22 +20,54 @@
 
 pipeline {
     agent any 
+    
+    parameters {
+        string(name: 'OBJECTS_TO_DEPLOY', 
+               defaultValue: '', 
+               description: 'Comma-separated list of objects to patch (e.g. "default/service2,default/service3")')
+        choice(name: 'DEPLOYMENT_MODE',
+               choices: ['full', 'patch'],
+               description: 'Select deployment mode')
+    }
 
     stages {
-        stage('Build'){
+        stage('Build') {
             steps {
                 bat "${env.SAG_HOME}/common/lib/ant/bin/ant -DSAGHome=${env.SAG_HOME} -DSAG_CI_HOME=${env.SAG_CI_HOME} -DprojectName=${env.JOB_NAME} build"
             }
         }
+        
         stage('Deploy') {
             steps {
-		bat "${env.SAG_HOME}/common/lib/ant/bin/ant -DSAGHome=${env.SAG_HOME} -DSAG_CI_HOME=${env.SAG_CI_HOME} -DprojectName=${env.JOB_NAME} deploy"
+                script {
+                    if (params.DEPLOYMENT_MODE == 'patch') {
+                        if (!params.OBJECTS_TO_DEPLOY?.trim()) {
+                            error('For patch deployment, OBJECTS_TO_DEPLOY parameter must be specified')
+                        }
+                        bat "${env.SAG_HOME}/common/lib/ant/bin/ant -DSAGHome=${env.SAG_HOME} -DSAG_CI_HOME=${env.SAG_CI_HOME} -DprojectName=${env.JOB_NAME} -DobjectsToDeploy=\"${params.OBJECTS_TO_DEPLOY}\" patch"
+                    } else {
+                        bat "${env.SAG_HOME}/common/lib/ant/bin/ant -DSAGHome=${env.SAG_HOME} -DSAG_CI_HOME=${env.SAG_CI_HOME} -DprojectName=${env.JOB_NAME} deploy"
+                    }
+                }
             }
         }
- 	stage('Test') {
+        
+        stage('Test') {
             steps {
-		bat "${env.SAG_HOME}/common/lib/ant/bin/ant -DSAGHome=${env.SAG_HOME} -DSAG_CI_HOME=${env.SAG_CI_HOME} -DprojectName=${env.JOB_NAME} test"
-		junit 'report/'
+                bat "${env.SAG_HOME}/common/lib/ant/bin/ant -DSAGHome=${env.SAG_HOME} -DSAG_CI_HOME=${env.SAG_CI_HOME} -DprojectName=${env.JOB_NAME} test"
+                junit 'report/'
+            }
+        }
+    }
+    
+    post {
+        success {
+            script {
+                if (params.DEPLOYMENT_MODE == 'patch') {
+                    echo "Patch deployment successful for objects: ${params.OBJECTS_TO_DEPLOY}"
+                } else {
+                    echo "Full deployment completed successfully"
+                }
             }
         }
     }
