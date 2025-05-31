@@ -31,7 +31,7 @@
         <ant dir="${SAG_CI_HOME_DYNAMIC}" antfile="${SAG_CI_HOME_DYNAMIC}/build.xml" target="test" inheritAll="true"/>
     </target>
     
-    <target name="patch" depends="init">
+    <target name="patch" depends="">
         <echo message="---- Starting patch deployment for objects: ${objectsToDeploy}"/>
         <ant dir="${SAG_CI_HOME_DYNAMIC}" 
              antfile="${SAG_CI_HOME_DYNAMIC}/build.xml" 
