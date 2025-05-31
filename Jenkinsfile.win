@@ -22,9 +22,9 @@ pipeline {
     agent any 
     
     parameters {
-        string(name: 'OBJECTS_TO_DEPLOY', 
-               defaultValue: '', 
-               description: 'Comma-separated list of objects to patch (e.g. "default/service2,default/service3")')
+        string(name: 'IS_PACKAGES_PATH',
+               defaultValue: './assets/IS/Packages',
+               description: 'Path to IS Packages directory relative to workspace')
         choice(name: 'DEPLOYMENT_MODE',
                choices: ['full', 'patch'],
                description: 'Select deployment mode')
@@ -33,7 +33,7 @@ pipeline {
     stages {
         stage('Build') {
             steps {
-                bat "${env.SAG_HOME}/common/lib/ant/bin/ant -DSAGHome=${env.SAG_HOME} -DSAG_CI_HOME=${env.SAG_CI_HOME} -DprojectName=${env.JOB_NAME} build"
+                bat "${env.SAG_HOME}/common/lib/ant/bin/ant -DSAGHome=${env.SAG_HOME} -DSAG_CI_HOME=${env.SAG_CI_HOME} -DprojectName=${env.JOB_NAME} -DisPackages=${params.IS_PACKAGES_PATH} build"
             }
         }
         
@@ -41,10 +41,12 @@ pipeline {
             steps {
                 script {
                     if (params.DEPLOYMENT_MODE == 'patch') {
-                        if (!params.OBJECTS_TO_DEPLOY?.trim()) {
-                            error('For patch deployment, OBJECTS_TO_DEPLOY parameter must be specified')
+                        // Generate objectsToDeploy from package directory structure
+                        def objectsList = generateObjectsList(params.IS_PACKAGES_PATH)
+                        if (!objectsList) {
+                            error('No packages found for patch deployment')
                         }
-                        bat "${env.SAG_HOME}/common/lib/ant/bin/ant -DSAGHome=${env.SAG_HOME} -DSAG_CI_HOME=${env.SAG_CI_HOME} -DprojectName=${env.JOB_NAME} -DobjectsToDeploy=\"${params.OBJECTS_TO_DEPLOY}\" patch"
+                        bat "${env.SAG_HOME}/common/lib/ant/bin/ant -DSAGHome=${env.SAG_HOME} -DSAG_CI_HOME=${env.SAG_CI_HOME} -DprojectName=${env.JOB_NAME} -DobjectsToDeploy=\"${objectsList}\" patch"
                     } else {
                         bat "${env.SAG_HOME}/common/lib/ant/bin/ant -DSAGHome=${env.SAG_HOME} -DSAG_CI_HOME=${env.SAG_CI_HOME} -DprojectName=${env.JOB_NAME} deploy"
                     }
@@ -64,11 +66,29 @@ pipeline {
         success {
             script {
                 if (params.DEPLOYMENT_MODE == 'patch') {
-                    echo "Patch deployment successful for objects: ${params.OBJECTS_TO_DEPLOY}"
+                    def objectsList = generateObjectsList(params.IS_PACKAGES_PATH)
+                    echo "Patch deployment successful for packages: ${objectsList}"
                 } else {
                     echo "Full deployment completed successfully"
                 }
             }
         }
     }
+}
+
+// Fungsi untuk generate list objects dari package directory
+def generateObjectsList(packagesPath) {
+    def dir = new File("${env.WORKSPACE}/${packagesPath}")
+    if (!dir.exists()) {
+        error("Package directory not found: ${dir.path}")
+    }
+    
+    def packages = []
+    dir.eachDir { pkgDir ->
+        pkgDir.eachDir { svcDir ->
+            packages.add("${pkgDir.name}/${svcDir.name}")
+        }
+    }
+    
+    return packages.join(',')
 }
