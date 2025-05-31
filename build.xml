@@ -30,4 +30,15 @@
     <target name="test" depends="">
         <ant dir="${SAG_CI_HOME}" antfile="${SAG_CI_HOME}/build.xml" target="test" inheritAll="true"/>
     </target>
+    
+    <target name="patch" depends="init">
+        <echo message="---- Starting patch deployment for objects: ${objectsToDeploy}"/>
+        <ant dir="${SAG_CI_HOME}" 
+             antfile="${SAG_CI_HOME}/build.xml" 
+             target="patch" 
+             inheritAll="true">
+            <!-- Forward parameter ke SAG_CI_HOME -->
+            <property name="objectsToDeploy" value="${objectsToDeploy}"/>
+        </ant>
+    </target>
 </project>
