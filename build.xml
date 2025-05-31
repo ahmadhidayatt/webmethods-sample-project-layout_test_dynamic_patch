@@ -16,28 +16,28 @@
     <property name="jenkinsReportDir" value="${workspace.dir}/report"/>
 
     <target name="buildDeployTest" depends="">
-        <ant dir="${SAG_CI_HOME}" antfile="${SAG_CI_HOME}/build.xml" target="buildDeployTest" inheritAll="true"/>
+        <ant dir="${SAG_CI_HOME_DYNAMIC}" antfile="${SAG_CI_HOME_DYNAMIC}/build.xml" target="buildDeployTest" inheritAll="true"/>
     </target>
 
     <target name="build" depends="">
-        <ant dir="${SAG_CI_HOME}" antfile="${SAG_CI_HOME}/build.xml" target="build" inheritAll="true"/>
+        <ant dir="${SAG_CI_HOME_DYNAMIC}" antfile="${SAG_CI_HOME_DYNAMIC}/build.xml" target="build" inheritAll="true"/>
     </target>
 
     <target name="deploy" depends="">
-        <ant dir="${SAG_CI_HOME}" antfile="${SAG_CI_HOME}/build.xml" target="deploy" inheritAll="true"/>
+        <ant dir="${SAG_CI_HOME_DYNAMIC}" antfile="${SAG_CI_HOME_DYNAMIC}/build.xml" target="deploy" inheritAll="true"/>
     </target>
 
     <target name="test" depends="">
-        <ant dir="${SAG_CI_HOME}" antfile="${SAG_CI_HOME}/build.xml" target="test" inheritAll="true"/>
+        <ant dir="${SAG_CI_HOME_DYNAMIC}" antfile="${SAG_CI_HOME_DYNAMIC}/build.xml" target="test" inheritAll="true"/>
     </target>
     
     <target name="patch" depends="init">
         <echo message="---- Starting patch deployment for objects: ${objectsToDeploy}"/>
-        <ant dir="${SAG_CI_HOME}" 
-             antfile="${SAG_CI_HOME}/build.xml" 
+        <ant dir="${SAG_CI_HOME_DYNAMIC}" 
+             antfile="${SAG_CI_HOME_DYNAMIC}/build.xml" 
              target="patch" 
              inheritAll="true">
-            <!-- Forward parameter ke SAG_CI_HOME -->
+            <!-- Forward parameter ke SAG_CI_HOME_DYNAMIC -->
             <property name="objectsToDeploy" value="${objectsToDeploy}"/>
         </ant>
     </target>
