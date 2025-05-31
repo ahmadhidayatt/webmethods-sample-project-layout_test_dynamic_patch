@@ -33,7 +33,7 @@ pipeline {
     stages {
         stage('Build') {
             steps {
-                bat "${env.SAG_HOME}/common/lib/ant/bin/ant -DSAGHome=${env.SAG_HOME} -DSAG_CI_HOME=${env.SAG_CI_HOME} -DprojectName=${env.JOB_NAME} -DisPackages=${params.IS_PACKAGES_PATH} build"
+                bat "${env.SAG_HOME}/common/lib/ant/bin/ant -DSAGHome=${env.SAG_HOME} -DSAG_CI_HOME_DYNAMIC=${env.SAG_CI_HOME_DYNAMIC} -DprojectName=${env.JOB_NAME} -DisPackages=${params.IS_PACKAGES_PATH} build"
             }
         }
         
@@ -48,9 +48,9 @@ pipeline {
                         }
                         
                         // POINT 2: Gunakan target 'patch' disini
-                        bat "${env.SAG_HOME}/common/lib/ant/bin/ant -DSAGHome=${env.SAG_HOME} -DSAG_CI_HOME=${env.SAG_CI_HOME} -DprojectName=${env.JOB_NAME} -DobjectsToDeploy=\"${objectsList}\" patch"
+                        bat "${env.SAG_HOME}/common/lib/ant/bin/ant -DSAGHome=${env.SAG_HOME} -DSAG_CI_HOME_DYNAMIC=${env.SAG_CI_HOME_DYNAMIC} -DprojectName=${env.JOB_NAME} -DobjectsToDeploy=\"${objectsList}\" patch"
                     } else {
-                        bat "${env.SAG_HOME}/common/lib/ant/bin/ant -DSAGHome=${env.SAG_HOME} -DSAG_CI_HOME=${env.SAG_CI_HOME} -DprojectName=${env.JOB_NAME} deploy"
+                        bat "${env.SAG_HOME}/common/lib/ant/bin/ant -DSAGHome=${env.SAG_HOME} -DSAG_CI_HOME_DYNAMIC=${env.SAG_CI_HOME_DYNAMIC} -DprojectName=${env.JOB_NAME} deploy"
                     }
                 }
             }
@@ -58,7 +58,7 @@ pipeline {
         
         stage('Test') {
             steps {
-                bat "${env.SAG_HOME}/common/lib/ant/bin/ant -DSAGHome=${env.SAG_HOME} -DSAG_CI_HOME=${env.SAG_CI_HOME} -DprojectName=${env.JOB_NAME} test"
+                bat "${env.SAG_HOME}/common/lib/ant/bin/ant -DSAGHome=${env.SAG_HOME} -DSAG_CI_HOME_DYNAMIC=${env.SAG_CI_HOME_DYNAMIC} -DprojectName=${env.JOB_NAME} test"
                 junit 'report/'
             }
         }
