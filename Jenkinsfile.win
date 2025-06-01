@@ -29,6 +29,8 @@ pipeline {
                         // Use proper escaping for Windows paths
                         def escapedObjects = objectsList.replace('\\', '/')
                         
+                        echo "Objects to deploy: ${escapedObjects}"
+                        
                         bat "\"${env.SAG_HOME}\\common\\lib\\ant\\bin\\ant\" -DSAGHome=\"${env.SAG_HOME}\" -DSAG_CI_HOME_DYNAMIC=\"${env.SAG_CI_HOME_DYNAMIC}\" -DprojectName=\"${env.JOB_NAME}\" -DobjectsToDeploy=\"${escapedObjects}\" patch"
                     } else {
                         bat "\"${env.SAG_HOME}\\common\\lib\\ant\\bin\\ant\" -DSAGHome=\"${env.SAG_HOME}\" -DSAG_CI_HOME_DYNAMIC=\"${env.SAG_CI_HOME_DYNAMIC}\" -DprojectName=\"${env.JOB_NAME}\" deploy"
@@ -46,6 +48,9 @@ pipeline {
     }
     
     post {
+        always {
+            echo "Pipeline completed with status: ${currentBuild.currentResult}"
+        }
         success {
             script {
                 if (params.DEPLOYMENT_MODE == 'patch') {
@@ -56,13 +61,18 @@ pipeline {
                 }
             }
         }
+        failure {
+            echo "Pipeline failed - please check logs for details"
+        }
     }
 }
 
 // Improved function to generate objects list
 def generateObjectsList(packagesPath) {
-    def dirPath = "${env.WORKSPACE}\\${packagesPath}"
+    def dirPath = "${env.WORKSPACE}/${packagesPath}"
     def dir = new File(dirPath)
+    
+    echo "Scanning directory: ${dirPath}"
     
     if (!dir.exists()) {
         error("Package directory not found: ${dir.path}")
@@ -72,22 +82,24 @@ def generateObjectsList(packagesPath) {
     def excludedDirs = ['config', 'resources', 'replicate']
     
     try {
-        // Use findFiles step which is more reliable in Jenkins
-        def files = findFiles(glob: "${packagesPath}/**")
+        // List all directories under the packages path
+        def packageDirs = dir.listFiles({ f -> f.isDirectory() } as FileFilter)
         
-        files.each { file ->
-            if (file.directory) {
-                def path = file.path.replace('\\', '/')
-                def isExcluded = excludedDirs.any { path.contains("/${it}") || path.endsWith("/${it}") }
+        packageDirs.each { packageDir ->
+            // Check namespace directories (like 'ns' in your path)
+            def nsDirs = packageDir.listFiles({ f -> f.isDirectory() } as FileFilter)
+            
+            nsDirs.each { nsDir ->
+                // Check service directories under namespace
+                def serviceDirs = nsDir.listFiles({ f -> f.isDirectory() } as FileFilter)
                 
-                if (!isExcluded) {
-                    // Get relative path from packagesPath
-                    def relativePath = path.substring(packagesPath.length())
-                    if (relativePath.startsWith('/')) {
-                        relativePath = relativePath.substring(1)
-                    }
-                    if (relativePath) {
+                serviceDirs.each { serviceDir ->
+                    def relativePath = "${packageDir.name}/${nsDir.name}/${serviceDir.name}"
+                    def isExcluded = excludedDirs.any { relativePath.contains("/${it}") || relativePath.endsWith("/${it}") }
+                    
+                    if (!isExcluded) {
                         objects.add(relativePath)
+                        echo "Found package: ${relativePath}"
                     }
                 }
             }
