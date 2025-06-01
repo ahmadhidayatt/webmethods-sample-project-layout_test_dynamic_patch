@@ -68,32 +68,40 @@ pipeline {
 }
 
 def generateObjectsList(packagesPath) {
-    def dir = new File("${env.WORKSPACE}/${packagesPath}")
-    if (!dir.exists()) {
-        error("Package directory not found: ${dir.path}")
-    }
+    def dirPath = "${env.WORKSPACE}/${packagesPath}"
+    echo "Scanning directory: ${dirPath}"
     
     def objects = []
-    def excludedDirs = ['config', 'resources', 'replicate'] // Folder yang diabaikan
+    def excludedDirs = ['config', 'resources', 'replicate']
     
-    // Iterasi secara rekursif semua folder di dalam packagesPath
-    dir.eachDirRecurse { currentDir ->
-        // Hitung path relatif terhadap dir (packagesPath)
-        def relativePath = currentDir.path.substring(dir.path.size() + 1)
-        def normalizedPath = relativePath.replace('\\', '/')
+    try {
+        // Use bat command to find directories (more reliable on Windows)
+        def result = bat(script: """
+            @echo off
+            cd "${dirPath}"
+            dir /b /s /ad | findstr /i /r "\\\\[^\\\\]*\\\\[^\\\\]*$"
+        """, returnStdout: true).trim()
         
-        // Periksa apakah path ini mengandung folder yang dikecualikan
-        def isExcluded = false
-        for (excluded in excludedDirs) {
-            if (normalizedPath.contains("/${excluded}/") || normalizedPath.endsWith("/${excluded}")) {
-                isExcluded = true
-                break
+        // Process the output
+        result.eachLine { line ->
+            def path = line.substring(dirPath.length() + 1).replace('\\', '/')
+            def parts = path.split('/')
+            
+            // Only include paths with exactly two levels (ns/service)
+            if (parts.size() == 2) {
+                def isExcluded = excludedDirs.any { path.contains("/${it}") || path.endsWith("/${it}") }
+                if (!isExcluded) {
+                    objects.add(path)
+                    echo "Found package: ${path}"
+                }
             }
         }
-        
-        if (!isExcluded) {
-            objects.add(normalizedPath)
-        }
+    } catch(Exception e) {
+        error("Error scanning package directory: ${e.message}")
+    }
+    
+    if (objects.isEmpty()) {
+        error("No valid packages found in ${dirPath}. Expected structure: ${packagesPath}/ns/service")
     }
     
     return objects.join(',')
