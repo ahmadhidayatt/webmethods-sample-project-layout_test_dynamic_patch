@@ -76,7 +76,7 @@ pipeline {
     }
 }
 
-// Fungsi baru yang mendukung struktur bertingkat
+// Fungsi untuk generate list objects dari package directory dengan struktur bertingkat
 def generateObjectsList(packagesPath) {
     def dir = new File("${env.WORKSPACE}/${packagesPath}")
     if (!dir.exists()) {
@@ -84,16 +84,26 @@ def generateObjectsList(packagesPath) {
     }
     
     def objects = []
+    def excludedDirs = ['config', 'resources', 'replicate'] // Folder yang diabaikan
     
-    // Iterate through all directories recursively
-    dir.eachDirRecurse { serviceDir ->
-        // Get relative path from packages directory
-        def relativePath = serviceDir.path.substring(dir.path.size() + 1)
+    // Iterasi secara rekursif semua folder di dalam packagesPath
+    dir.eachDirRecurse { currentDir ->
+        // Hitung path relatif terhadap dir (packagesPath)
+        def relativePath = currentDir.path.substring(dir.path.size() + 1)
+        def normalizedPath = relativePath.replace('\\', '/')
         
-        // Skip directories that are not service folders (optional)
-        // Add your custom filtering logic here if needed
+        // Periksa apakah path ini mengandung folder yang dikecualikan
+        def isExcluded = false
+        for (excluded in excludedDirs) {
+            if (normalizedPath.contains("/${excluded}/") || normalizedPath.endsWith("/${excluded}")) {
+                isExcluded = true
+                break
+            }
+        }
         
-        objects.add(relativePath.replace('\\', '/'))
+        if (!isExcluded) {
+            objects.add(normalizedPath)
+        }
     }
     
     return objects.join(',')
