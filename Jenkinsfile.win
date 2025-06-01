@@ -25,7 +25,7 @@ pipeline {
                         if (!objectsList) {
                             error('No packages found for patch deployment')
                         }
-                        
+                        echo "Objects to deploy: ${objectsList}"
                         // Use proper escaping for Windows paths
                         def escapedObjects = objectsList.replace('\\', '/')
                         
@@ -68,45 +68,36 @@ pipeline {
 }
 
 def generateObjectsList(packagesPath) {
-    // Convert packagesPath to Windows format
-    def dirPath = "${env.WORKSPACE}\\${packagesPath}".replace('/', '\\')
-    echo "Scanning directory: ${dirPath}"
+    def dirPath = "${env.WORKSPACE}/${packagesPath}"
+    def dir = new File(dirPath)
+    if (!dir.exists()) {
+        error("Package directory not found: ${dir.path}")
+    }
     
     def objects = []
     def excludedDirs = ['config', 'resources', 'replicate']
     
-    try {
-        // Use bat command with proper escaping
-        def result = bat(script: """
-            @echo off
-            cd "${dirPath}"
-            for /f "tokens=*" %%a in ('dir /b /s /ad ^| findstr /i /r "\\\\[^\\\\]*\\\\[^\\\\]*$"') do (
-                echo %%~a
-            )
-        """, returnStdout: true).trim()
+    // Gunakan perintah shell untuk mendapatkan semua folder
+    def command = "dir \"${dirPath}\" /b /s /ad"
+    def output = bat(script: command, returnStdout: true).trim()
+    
+    output.eachLine { absolutePath ->
+        // Dapatkan path relatif terhadap packagesPath
+        def relativePath = absolutePath.substring(dir.path.size() + 1)
+        def normalizedPath = relativePath.replace('\\', '/')
         
-        // Process the output
-        result.eachLine { line ->
-            def path = line.substring(dirPath.length() + 1).replace('\\', '/')
-            def parts = path.split('/')
-            
-            // Only include paths with exactly two levels (ns/service)
-            if (parts.size() == 2) {
-                def isExcluded = excludedDirs.any { excl -> 
-                    path.contains("/${excl}") || path.endsWith("/${excl}") 
-                }
-                if (!isExcluded) {
-                    objects.add(path)
-                    echo "Found package: ${path}"
-                }
+        // Periksa apakah path ini dikecualikan
+        def isExcluded = false
+        for (excluded in excludedDirs) {
+            if (normalizedPath.contains("/${excluded}/") || normalizedPath.endsWith("/${excluded}")) {
+                isExcluded = true
+                break
             }
         }
-    } catch(Exception e) {
-        error("Error scanning package directory: ${e.message}")
-    }
-    
-    if (objects.isEmpty()) {
-        error("No valid packages found in ${dirPath}. Expected structure: ${packagesPath}/ns/service")
+        
+        if (!isExcluded && normalizedPath) {
+            objects.add(normalizedPath)
+        }
     }
     
     return objects.join(',')
