@@ -68,18 +68,21 @@ pipeline {
 }
 
 def generateObjectsList(packagesPath) {
-    def dirPath = "${env.WORKSPACE}/${packagesPath}"
+    // Convert packagesPath to Windows format
+    def dirPath = "${env.WORKSPACE}\\${packagesPath}".replace('/', '\\')
     echo "Scanning directory: ${dirPath}"
     
     def objects = []
     def excludedDirs = ['config', 'resources', 'replicate']
     
     try {
-        // Use bat command to find directories (more reliable on Windows)
+        // Use bat command with proper escaping
         def result = bat(script: """
             @echo off
             cd "${dirPath}"
-            dir /b /s /ad | findstr /i /r "\\\\[^\\\\]*\\\\[^\\\\]*$"
+            for /f "tokens=*" %%a in ('dir /b /s /ad ^| findstr /i /r "\\\\[^\\\\]*\\\\[^\\\\]*$"') do (
+                echo %%~a
+            )
         """, returnStdout: true).trim()
         
         // Process the output
@@ -89,7 +92,9 @@ def generateObjectsList(packagesPath) {
             
             // Only include paths with exactly two levels (ns/service)
             if (parts.size() == 2) {
-                def isExcluded = excludedDirs.any { path.contains("/${it}") || path.endsWith("/${it}") }
+                def isExcluded = excludedDirs.any { excl -> 
+                    path.contains("/${excl}") || path.endsWith("/${excl}") 
+                }
                 if (!isExcluded) {
                     objects.add(path)
                     echo "Found package: ${path}"
