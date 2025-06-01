@@ -83,14 +83,18 @@ def generateObjectsList(packagesPath) {
         error("Package directory not found: ${dir.path}")
     }
     
-    def services = []
-    dir.eachDir { pkgDir ->  // e.g., Default
-        pkgDir.eachDir { groupDir ->  // e.g., ns
-            groupDir.eachDir { svcDir ->  // e.g., test_1
-                services.add("${pkgDir.name}/${svcDir.name}")
-            }
-        }
+    def objects = []
+    
+    // Iterate through all directories recursively
+    dir.eachDirRecurse { serviceDir ->
+        // Get relative path from packages directory
+        def relativePath = serviceDir.path.substring(dir.path.size() + 1)
+        
+        // Skip directories that are not service folders (optional)
+        // Add your custom filtering logic here if needed
+        
+        objects.add(relativePath.replace('\\', '/'))
     }
     
-    return services.join(',')
+    return objects.join(',')
 }
