@@ -1,3 +1,4 @@
+import groovy.io.FileType
 pipeline {
     agent any 
     
@@ -73,32 +74,20 @@ def generateObjectsList(packagesPath) {
     if (!dir.exists()) {
         error("Package directory not found: ${dir.path}")
     }
-    
+
     def objects = []
     def excludedDirs = ['config', 'resources', 'replicate']
-    
-    // Gunakan perintah shell untuk mendapatkan semua folder
-    def command = "dir \"${dirPath}\" /b /s /ad"
-    def output = bat(script: command, returnStdout: true).trim()
-    
-    output.eachLine { absolutePath ->
-        // Dapatkan path relatif terhadap packagesPath
-        def relativePath = absolutePath.substring(dir.path.size() + 1)
+
+    dir.eachFileRecurse(FileType.DIRECTORIES) { file ->
+        def relativePath = file.path - "${dir.path}${File.separator}"
         def normalizedPath = relativePath.replace('\\', '/')
-        
-        // Periksa apakah path ini dikecualikan
-        def isExcluded = false
-        for (excluded in excludedDirs) {
-            if (normalizedPath.contains("/${excluded}/") || normalizedPath.endsWith("/${excluded}")) {
-                isExcluded = true
-                break
-            }
-        }
-        
+
+        def isExcluded = excludedDirs.any { ex -> normalizedPath.contains("/${ex}/") || normalizedPath.endsWith("/${ex}") }
         if (!isExcluded && normalizedPath) {
-            objects.add(normalizedPath)
+            objects << normalizedPath
         }
     }
-    
+
     return objects.join(',')
 }
+
