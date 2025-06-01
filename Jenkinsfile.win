@@ -67,43 +67,33 @@ pipeline {
     }
 }
 
-// Improved function to generate objects list
-// Corrected function to generate objects list
 def generateObjectsList(packagesPath) {
-    def dirPath = "${env.WORKSPACE}/${packagesPath}"
-    echo "Scanning directory: ${dirPath}"
-    
-    def objects = []
-    def excludedDirs = ['config', 'resources', 'replicate']
-    
-    try {
-        // Use findFiles step which is more reliable in Jenkins
-        def allFiles = findFiles(glob: "${packagesPath}/**/*")
-        
-        // Group by directory paths
-        def dirPaths = allFiles.collect { it.path.substring(0, it.path.lastIndexOf('/')) }.unique()
-        
-        // Find valid package paths (ns/service)
-        dirPaths.each { path ->
-            def parts = path.split('/')
-            if (parts.size() >= 3 && 
-                parts[0] == packagesPath && 
-                !excludedDirs.any { path.contains("/${it}") || path.endsWith("/${it}") }) {
-                
-                // Get the ns/service portion
-                def relativePath = path.substring(packagesPath.length() + 1)
-                if (relativePath.split('/').size() == 2) { // Ensure ns/service format
-                    objects.add(relativePath)
-                    echo "Found package: ${relativePath}"
-                }
-            }
-        }
-    } catch(Exception e) {
-        error("Error scanning package directory: ${e.message}")
+    def dir = new File("${env.WORKSPACE}/${packagesPath}")
+    if (!dir.exists()) {
+        error("Package directory not found: ${dir.path}")
     }
     
-    if (objects.isEmpty()) {
-        error("No valid packages found in ${dirPath}. Expected structure: ${packagesPath}/ns/service")
+    def objects = []
+    def excludedDirs = ['config', 'resources', 'replicate'] // Folder yang diabaikan
+    
+    // Iterasi secara rekursif semua folder di dalam packagesPath
+    dir.eachDirRecurse { currentDir ->
+        // Hitung path relatif terhadap dir (packagesPath)
+        def relativePath = currentDir.path.substring(dir.path.size() + 1)
+        def normalizedPath = relativePath.replace('\\', '/')
+        
+        // Periksa apakah path ini mengandung folder yang dikecualikan
+        def isExcluded = false
+        for (excluded in excludedDirs) {
+            if (normalizedPath.contains("/${excluded}/") || normalizedPath.endsWith("/${excluded}")) {
+                isExcluded = true
+                break
+            }
+        }
+        
+        if (!isExcluded) {
+            objects.add(normalizedPath)
+        }
     }
     
     return objects.join(',')
