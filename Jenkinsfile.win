@@ -78,31 +78,37 @@ pipeline {
 
 // Fungsi untuk generate list objects dari package directory dengan struktur bertingkat
 def generateObjectsList(packagesPath) {
-    def dir = new File("${env.WORKSPACE}/${packagesPath}")
+    def dirPath = "${env.WORKSPACE}/${packagesPath}"
+    def dir = new File(dirPath)
     if (!dir.exists()) {
         error("Package directory not found: ${dir.path}")
     }
     
     def objects = []
-    def excludedDirs = ['config', 'resources', 'replicate'] // Folder yang diabaikan
+    def excludedDirs = ['config', 'resources', 'replicate']
     
-    // Iterasi secara rekursif semua folder di dalam packagesPath
-    dir.eachDirRecurse { currentDir ->
-        // Hitung path relatif terhadap dir (packagesPath)
-        def relativePath = currentDir.path.substring(dir.path.size() + 1)
-        def normalizedPath = relativePath.replace('\\', '/')
-        
-        // Periksa apakah path ini mengandung folder yang dikecualikan
-        def isExcluded = false
-        for (excluded in excludedDirs) {
-            if (normalizedPath.contains("/${excluded}/") || normalizedPath.endsWith("/${excluded}")) {
-                isExcluded = true
-                break
+    // Gunakan findFiles untuk mendapatkan semua folder
+    def allDirs = findFiles glob: '**/', includes: dirPath + '/**'
+    
+    allDirs.each { file ->
+        if (file.directory) {
+            def absolutePath = file.path
+            // Dapatkan path relatif terhadap packagesPath
+            def relativePath = absolutePath.substring(dirPath.length() + 1)
+            def normalizedPath = relativePath.replace('\\', '/')
+            
+            // Periksa apakah path ini dikecualikan
+            def isExcluded = false
+            for (excluded in excludedDirs) {
+                if (normalizedPath.contains("/${excluded}/") || normalizedPath.endsWith("/${excluded}")) {
+                    isExcluded = true
+                    break
+                }
             }
-        }
-        
-        if (!isExcluded) {
-            objects.add(normalizedPath)
+            
+            if (!isExcluded && normalizedPath) {
+                objects.add(normalizedPath)
+            }
         }
     }
     
