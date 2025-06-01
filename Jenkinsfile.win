@@ -68,39 +68,33 @@ pipeline {
 }
 
 // Improved function to generate objects list
+// Corrected function to generate objects list
 def generateObjectsList(packagesPath) {
     def dirPath = "${env.WORKSPACE}/${packagesPath}"
-    def dir = new File(dirPath)
-    
     echo "Scanning directory: ${dirPath}"
-    
-    if (!dir.exists()) {
-        error("Package directory not found: ${dir.path}")
-    }
     
     def objects = []
     def excludedDirs = ['config', 'resources', 'replicate']
     
     try {
-        // List all directories under the packages path
-        def packageDirs = dir.listFiles({ f -> f.isDirectory() } as FileFilter)
+        // Use findFiles step which is more reliable in Jenkins
+        def allFiles = findFiles(glob: "${packagesPath}/**/*")
         
-        packageDirs.each { packageDir ->
-            // Check namespace directories (like 'ns' in your path)
-            def nsDirs = packageDir.listFiles({ f -> f.isDirectory() } as FileFilter)
-            
-            nsDirs.each { nsDir ->
-                // Check service directories under namespace
-                def serviceDirs = nsDir.listFiles({ f -> f.isDirectory() } as FileFilter)
+        // Group by directory paths
+        def dirPaths = allFiles.collect { it.path.substring(0, it.path.lastIndexOf('/')) }.unique()
+        
+        // Find valid package paths (ns/service)
+        dirPaths.each { path ->
+            def parts = path.split('/')
+            if (parts.size() >= 3 && 
+                parts[0] == packagesPath && 
+                !excludedDirs.any { path.contains("/${it}") || path.endsWith("/${it}") }) {
                 
-                serviceDirs.each { serviceDir ->
-                    def relativePath = "${packageDir.name}/${nsDir.name}/${serviceDir.name}"
-                    def isExcluded = excludedDirs.any { relativePath.contains("/${it}") || relativePath.endsWith("/${it}") }
-                    
-                    if (!isExcluded) {
-                        objects.add(relativePath)
-                        echo "Found package: ${relativePath}"
-                    }
+                // Get the ns/service portion
+                def relativePath = path.substring(packagesPath.length() + 1)
+                if (relativePath.split('/').size() == 2) { // Ensure ns/service format
+                    objects.add(relativePath)
+                    echo "Found package: ${relativePath}"
                 }
             }
         }
@@ -109,7 +103,7 @@ def generateObjectsList(packagesPath) {
     }
     
     if (objects.isEmpty()) {
-        return null
+        error("No valid packages found in ${dirPath}. Expected structure: ${packagesPath}/ns/service")
     }
     
     return objects.join(',')
