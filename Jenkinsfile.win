@@ -1,23 +1,3 @@
-/*
-* Copyright © 2010 - 2013 Apama Ltd.
-* Copyright © 2013 - 2018 Software AG, Darmstadt, Germany and/or its licensors
-*
-* SPDX-License-Identifier: Apache-2.0
-*
-*   Licensed under the Apache License, Version 2.0 (the "License");
-*   you may not use this file except in compliance with the License.
-*   You may obtain a copy of the License at
-*
-*       http://www.apache.org/licenses/LICENSE-2.0
-*
-*   Unless required by applicable law or agreed to in writing, software
-*   distributed under the License is distributed on an "AS IS" BASIS,
-*   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-*   See the License for the specific language governing permissions and
-*   limitations under the License.                                                            
-*
-*/
-
 pipeline {
     agent any 
     
@@ -33,7 +13,7 @@ pipeline {
     stages {
         stage('Build') {
             steps {
-                bat "${env.SAG_HOME}/common/lib/ant/bin/ant -DSAGHome=${env.SAG_HOME} -DSAG_CI_HOME_DYNAMIC=${env.SAG_CI_HOME_DYNAMIC} -DprojectName=${env.JOB_NAME} -DisPackages=${params.IS_PACKAGES_PATH} build"
+                bat "\"${env.SAG_HOME}\\common\\lib\\ant\\bin\\ant\" -DSAGHome=\"${env.SAG_HOME}\" -DSAG_CI_HOME_DYNAMIC=\"${env.SAG_CI_HOME_DYNAMIC}\" -DprojectName=\"${env.JOB_NAME}\" -DisPackages=\"${params.IS_PACKAGES_PATH}\" build"
             }
         }
         
@@ -46,9 +26,12 @@ pipeline {
                             error('No packages found for patch deployment')
                         }
                         
-                        bat "${env.SAG_HOME}/common/lib/ant/bin/ant -DSAGHome=${env.SAG_HOME} -DSAG_CI_HOME_DYNAMIC=${env.SAG_CI_HOME_DYNAMIC} -DprojectName=${env.JOB_NAME} -DobjectsToDeploy=\"${objectsList}\" patch"
+                        // Use proper escaping for Windows paths
+                        def escapedObjects = objectsList.replace('\\', '/')
+                        
+                        bat "\"${env.SAG_HOME}\\common\\lib\\ant\\bin\\ant\" -DSAGHome=\"${env.SAG_HOME}\" -DSAG_CI_HOME_DYNAMIC=\"${env.SAG_CI_HOME_DYNAMIC}\" -DprojectName=\"${env.JOB_NAME}\" -DobjectsToDeploy=\"${escapedObjects}\" patch"
                     } else {
-                        bat "${env.SAG_HOME}/common/lib/ant/bin/ant -DSAGHome=${env.SAG_HOME} -DSAG_CI_HOME_DYNAMIC=${env.SAG_CI_HOME_DYNAMIC} -DprojectName=${env.JOB_NAME} deploy"
+                        bat "\"${env.SAG_HOME}\\common\\lib\\ant\\bin\\ant\" -DSAGHome=\"${env.SAG_HOME}\" -DSAG_CI_HOME_DYNAMIC=\"${env.SAG_CI_HOME_DYNAMIC}\" -DprojectName=\"${env.JOB_NAME}\" deploy"
                     }
                 }
             }
@@ -56,7 +39,7 @@ pipeline {
         
         stage('Test') {
             steps {
-                bat "${env.SAG_HOME}/common/lib/ant/bin/ant -DSAGHome=${env.SAG_HOME} -DSAG_CI_HOME_DYNAMIC=${env.SAG_CI_HOME_DYNAMIC} -DprojectName=${env.JOB_NAME} test"
+                bat "\"${env.SAG_HOME}\\common\\lib\\ant\\bin\\ant\" -DSAGHome=\"${env.SAG_HOME}\" -DSAG_CI_HOME_DYNAMIC=\"${env.SAG_CI_HOME_DYNAMIC}\" -DprojectName=\"${env.JOB_NAME}\" test"
                 junit 'report/**/*.xml'
             }
         }
@@ -76,10 +59,11 @@ pipeline {
     }
 }
 
-// Fungsi yang kompatibel tanpa dependensi plugin tambahan
+// Improved function to generate objects list
 def generateObjectsList(packagesPath) {
-    def dirPath = "${env.WORKSPACE}/${packagesPath}"
+    def dirPath = "${env.WORKSPACE}\\${packagesPath}"
     def dir = new File(dirPath)
+    
     if (!dir.exists()) {
         error("Package directory not found: ${dir.path}")
     }
@@ -87,27 +71,33 @@ def generateObjectsList(packagesPath) {
     def objects = []
     def excludedDirs = ['config', 'resources', 'replicate']
     
-    // Gunakan perintah shell untuk mendapatkan semua folder
-    def command = "dir \"${dirPath}\" /b /s /ad"
-    def output = bat(script: command, returnStdout: true).trim()
-    
-    output.eachLine { absolutePath ->
-        // Dapatkan path relatif terhadap packagesPath
-        def relativePath = absolutePath.substring(dir.path.size() + 1)
-        def normalizedPath = relativePath.replace('\\', '/')
+    try {
+        // Use findFiles step which is more reliable in Jenkins
+        def files = findFiles(glob: "${packagesPath}/**")
         
-        // Periksa apakah path ini dikecualikan
-        def isExcluded = false
-        for (excluded in excludedDirs) {
-            if (normalizedPath.contains("/${excluded}/") || normalizedPath.endsWith("/${excluded}")) {
-                isExcluded = true
-                break
+        files.each { file ->
+            if (file.directory) {
+                def path = file.path.replace('\\', '/')
+                def isExcluded = excludedDirs.any { path.contains("/${it}") || path.endsWith("/${it}") }
+                
+                if (!isExcluded) {
+                    // Get relative path from packagesPath
+                    def relativePath = path.substring(packagesPath.length())
+                    if (relativePath.startsWith('/')) {
+                        relativePath = relativePath.substring(1)
+                    }
+                    if (relativePath) {
+                        objects.add(relativePath)
+                    }
+                }
             }
         }
-        
-        if (!isExcluded && normalizedPath) {
-            objects.add(normalizedPath)
-        }
+    } catch(Exception e) {
+        error("Error scanning package directory: ${e.message}")
+    }
+    
+    if (objects.isEmpty()) {
+        return null
     }
     
     return objects.join(',')
