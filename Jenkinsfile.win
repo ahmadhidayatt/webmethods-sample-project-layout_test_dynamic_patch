@@ -41,13 +41,11 @@ pipeline {
             steps {
                 script {
                     if (params.DEPLOYMENT_MODE == 'patch') {
-                        // Generate objectsToDeploy from package directory structure
                         def objectsList = generateObjectsList(params.IS_PACKAGES_PATH)
                         if (!objectsList) {
                             error('No packages found for patch deployment')
                         }
                         
-                        // POINT 2: Gunakan target 'patch' disini
                         bat "${env.SAG_HOME}/common/lib/ant/bin/ant -DSAGHome=${env.SAG_HOME} -DSAG_CI_HOME_DYNAMIC=${env.SAG_CI_HOME_DYNAMIC} -DprojectName=${env.JOB_NAME} -DobjectsToDeploy=\"${objectsList}\" patch"
                     } else {
                         bat "${env.SAG_HOME}/common/lib/ant/bin/ant -DSAGHome=${env.SAG_HOME} -DSAG_CI_HOME_DYNAMIC=${env.SAG_CI_HOME_DYNAMIC} -DprojectName=${env.JOB_NAME} deploy"
@@ -59,7 +57,7 @@ pipeline {
         stage('Test') {
             steps {
                 bat "${env.SAG_HOME}/common/lib/ant/bin/ant -DSAGHome=${env.SAG_HOME} -DSAG_CI_HOME_DYNAMIC=${env.SAG_CI_HOME_DYNAMIC} -DprojectName=${env.JOB_NAME} test"
-                junit 'report/'
+                junit 'report/**/*.xml'
             }
         }
     }
@@ -69,7 +67,7 @@ pipeline {
             script {
                 if (params.DEPLOYMENT_MODE == 'patch') {
                     def objectsList = generateObjectsList(params.IS_PACKAGES_PATH)
-                    echo "Patch deployment successful for packages: ${objectsList}"
+                    echo "Patch deployment successful for services: ${objectsList}"
                 } else {
                     echo "Full deployment completed successfully"
                 }
@@ -78,19 +76,21 @@ pipeline {
     }
 }
 
-// Fungsi untuk generate list objects dari package directory
+// Fungsi baru yang mendukung struktur bertingkat
 def generateObjectsList(packagesPath) {
     def dir = new File("${env.WORKSPACE}/${packagesPath}")
     if (!dir.exists()) {
         error("Package directory not found: ${dir.path}")
     }
     
-    def packages = []
-    dir.eachDir { pkgDir ->
-        pkgDir.eachDir { svcDir ->
-            packages.add("${pkgDir.name}/${svcDir.name}")
+    def services = []
+    dir.eachDir { pkgDir ->  // e.g., Default
+        pkgDir.eachDir { groupDir ->  // e.g., ns
+            groupDir.eachDir { svcDir ->  // e.g., test_1
+                services.add("${pkgDir.name}/${svcDir.name}")
+            }
         }
     }
     
-    return packages.join(',')
+    return services.join(',')
 }
